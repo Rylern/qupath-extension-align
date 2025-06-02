@@ -21,20 +21,22 @@
 
 package qupath.ext.align.gui;
 
-import qupath.fx.dialogs.Dialogs;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import qupath.lib.gui.QuPathGUI;
 
-import java.util.ResourceBundle;
+import java.io.IOException;
 
 /**
  * Command to interactively adjust apply an affine transform to an image overlay.
  * 
  * @author Pete Bankhead
  */
-public class InteractiveImageAlignmentCommand implements Runnable {
+class InteractiveImageAlignmentCommand implements Runnable {
 
-	private static final ResourceBundle resources = Utils.getResources();
+	private static final Logger logger = LoggerFactory.getLogger(InteractiveImageAlignmentCommand.class);
 	private final QuPathGUI qupath;
+	private ImageOverlayAlignmentWindow imageOverlayAlignmentWindow;
 	
 	/**
 	 * Constructor.
@@ -47,13 +49,16 @@ public class InteractiveImageAlignmentCommand implements Runnable {
 
 	@Override
 	public void run() {
-		if (qupath.getImageData() == null) {
-			Dialogs.showErrorMessage(
-					resources.getString("InteractiveImageAlignmentCommand.interactiveImageAlignment"),
-					resources.getString("InteractiveImageAlignmentCommand.openImageFirst")
-			);
-			return;
-		}
+		if (imageOverlayAlignmentWindow == null) {
+            try {
+                imageOverlayAlignmentWindow = new ImageOverlayAlignmentWindow(qupath);
+            } catch (IOException e) {
+				logger.error("Error while creating image overlay alignment window", e);
+				return;
+            }
+        }
+		imageOverlayAlignmentWindow.show();
+		imageOverlayAlignmentWindow.requestFocus();
 
 		new ImageAlignmentPane(qupath);
 	}
