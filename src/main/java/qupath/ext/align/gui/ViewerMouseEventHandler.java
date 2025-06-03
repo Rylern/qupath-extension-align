@@ -43,7 +43,7 @@ class ViewerMouseEventHandler {
                         double dx = point.getX() - pDragging.getX();
                         double dy = point.getY() - pDragging.getY();
                         overlay.getAffine().appendTranslation(-dx, -dy);
-                        event.consume();        //TODO: why consume?
+                        event.consume();
                     }
                     pDragging = point;
                 }
@@ -52,7 +52,7 @@ class ViewerMouseEventHandler {
 
         this.viewerListener = (ChangeListener<QuPathViewer>) (p, o, n) -> {
             if (o != null) {
-                o.getView().removeEventFilter(MouseEvent.ANY, mouseEventHandler);   //TODO: why event filter?
+                o.getView().removeEventFilter(MouseEvent.ANY, mouseEventHandler);
             }
             if (n != null) {
                 n.getView().addEventFilter(MouseEvent.ANY, mouseEventHandler);

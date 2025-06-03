@@ -5,8 +5,8 @@ import javafx.beans.binding.ObjectBinding;
 import javafx.beans.property.ObjectProperty;
 import javafx.beans.property.SimpleObjectProperty;
 import javafx.event.ActionEvent;
+import javafx.event.EventHandler;
 import javafx.fxml.FXML;
-import javafx.fxml.FXMLLoader;
 import javafx.scene.control.Button;
 import javafx.scene.control.ButtonType;
 import javafx.scene.control.ComboBox;
@@ -15,29 +15,31 @@ import javafx.scene.control.Slider;
 import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
 import javafx.scene.control.TextFormatter;
+import javafx.scene.transform.Affine;
 import javafx.scene.transform.TransformChangedEvent;
 import javafx.stage.Stage;
 import javafx.util.StringConverter;
 import org.controlsfx.control.CheckListView;
-import org.controlsfx.control.ListSelectionView;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import qupath.ext.align.core.AlignmentType;
+import qupath.ext.align.core.AutoAligner;
+import qupath.ext.align.core.RegistrationType;
+import qupath.fx.dialogs.Dialogs;
 import qupath.lib.gui.QuPathGUI;
 import qupath.lib.gui.images.stores.ImageRenderer;
+import qupath.lib.gui.viewer.QuPathViewer;
 import qupath.lib.images.ImageData;
 import qupath.lib.objects.PathObject;
 import qupath.lib.projects.Project;
-import qupath.lib.projects.ProjectImageEntry;
 
 import java.awt.image.BufferedImage;
 import java.io.IOException;
-import java.util.ArrayList;
+import java.text.MessageFormat;
 import java.util.Collection;
-import java.util.HashSet;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
+import java.util.Objects;
 import java.util.ResourceBundle;
 import java.util.Set;
 import java.util.WeakHashMap;
@@ -59,16 +61,9 @@ class ImageOverlayAlignmentWindow extends Stage {
             () -> mapOverlays.get(selectedImageData.get()),
             selectedImageData
     );
+    private final EventHandler<TransformChangedEvent> transformEventHandler = event -> affineTransformUpdated();
     private final QuPathGUI quPath;
-    private enum RegistrationType {
-        AFFINE,
-        RIGID
-    }
-    private enum AlignmentType {
-        INTENSITY,
-        AREA_ANNOTATIONS,
-        POINT_ANNOTATIONS
-    }
+    private record ImageDataRenderer(ImageData<BufferedImage> imageData, ImageRenderer renderer) {}
     @FXML
     private CheckListView<ImageData<BufferedImage>> images;
     @FXML
@@ -199,73 +194,122 @@ class ImageOverlayAlignmentWindow extends Stage {
             ImageServerOverlay overlay = mapOverlays.remove(image);
             if (overlay != null) {
                 overlay.getAffine().removeEventHandler(TransformChangedEvent.ANY, transformEventHandler);
-                viewer.getCustomOverlayLayers().remove(overlay);
+                quPath.getViewer().getCustomOverlayLayers().remove(overlay);    //TODO: handle changes in viewer
             }
         }
 
+        List<ImageDataRenderer> imageDataRenderersToAdd = imagesSelector.getSelectedImages().stream()
+                .map(entry -> {
+                    // Try to get data from an open viewer first, if possible
+                    for (QuPathViewer viewer : quPath.getAllViewers()) {
+                        var imageData = viewer.getImageData();
 
-
-
-
-
-        // Add any images that need to be added
-        List<ImageData<BufferedImage>> imagesToAdd = new ArrayList<>();
-        for (ProjectImageEntry<BufferedImage> temp : toSelect) {
-            ImageData<BufferedImage> imageData = null;
-            ImageRenderer renderer = null;
-
-            // Read annotations from any data file
-            try {
-                // Try to get data from an open viewer first, if possible
-                for (var viewer : qupath.getAllViewers()) {
-                    var tempData = viewer.getImageData();
-                    if (tempData != null && temp.equals(project.getEntry(viewer.getImageData()))) {
-                        imageData = tempData;
-                        //@phaub Support of viewer display settings
-                        renderer = viewer.getImageDisplay();
-                        break;
+                        if (imageData != null && entry.equals(project.getEntry(viewer.getImageData()))) {
+                            return new ImageDataRenderer(imageData, viewer.getImageDisplay());
+                        }
                     }
-                }
-                // Read the data from the project if necessary
-                if (imageData == null) {
-                    if (temp.hasImageData()) {
-                        imageData = temp.readImageData();
-                        // Remove non-annotations to save memory
-                        Collection<PathObject> pathObjects = imageData.getHierarchy().getObjects(null, null);
-                        Set<PathObject> pathObjectsToRemove = pathObjects.stream().filter(p -> !p.isAnnotation()).collect(Collectors.toSet());
-                        imageData.getHierarchy().removeObjects(pathObjectsToRemove, true);
-                    } else {
-                        // Read the data from the project (but without a data file we expect this to really create a new image)
-                        imageData = temp.readImageData();
-                    }
-                }
-            } catch (IOException e) {
-                logger.error("Unable to read ImageData for " + temp.getImageName(), e);
-                continue;
-            }
-            ImageServerOverlay overlay = new ImageServerOverlay(viewer, imageData.getServer());
-            overlay.setRenderer(renderer);
 
+                    // Read the data from the project if necessary
+                    try {
+                        if (entry.hasImageData()) {
+                            ImageData<BufferedImage> imageData = entry.readImageData();
+
+                            // Remove non-annotations to save memory
+                            Collection<PathObject> pathObjects = imageData.getHierarchy().getObjects(null, null);
+                            Set<PathObject> pathObjectsToRemove = pathObjects.stream().filter(p -> !p.isAnnotation()).collect(Collectors.toSet());
+                            imageData.getHierarchy().removeObjects(pathObjectsToRemove, true);
+
+                            return new ImageDataRenderer(imageData, null);
+                        } else {
+                            // Read the data from the project (but without a data file we expect this to really create a new image)
+                            return new ImageDataRenderer(entry.readImageData(), null);
+                        }
+                    } catch (IOException e) {
+                        logger.error("Unable to read ImageData for {}. Cannot add it to the image list", entry, e);
+                        return null;
+                    }
+                })
+                .filter(Objects::nonNull)
+                .toList();
+
+        for (var imageDataRenderer: imageDataRenderersToAdd) {
+            ImageServerOverlay overlay = new ImageServerOverlay(quPath.getViewer(), imageDataRenderer.imageData().getServer());
+            overlay.setRenderer(imageDataRenderer.renderer());
             overlay.getAffine().addEventHandler(TransformChangedEvent.ANY, transformEventHandler);
-            mapOverlays.put(imageData, overlay);
-            imagesToAdd.add(imageData);
+            mapOverlays.put(imageDataRenderer.imageData(), overlay);
         }
-        images.addAll(0, imagesToAdd);
+        images.getItems().addAll(0, imageDataRenderersToAdd.stream().map(ImageDataRenderer::imageData).toList());
     }
 
     @FXML
     private void onRotateLeftClicked(ActionEvent ignored) {
-        //TODO
+        rotate(1);
     }
 
     @FXML
     private void onRotateRightClicked(ActionEvent ignored) {
-        //TODO
+        rotate(-1);
     }
 
     @FXML
     private void onEstimateTransformClicked(ActionEvent ignored) {
-        //TODO
+        double pixelSizeMicrons;
+        try {
+            pixelSizeMicrons = Double.parseDouble(pixelSize.getText());
+        } catch (NumberFormatException e) {
+            Dialogs.showErrorMessage(
+                    resources.getString("ImageOverlayAlignmentWindow.alignmentError"),
+                    MessageFormat.format(
+                            resources.getString("ImageOverlayAlignmentWindow.pixelSizeCannotBeConvertedToNumber"),
+                            pixelSize.getText()
+                    )
+            );
+            return;
+        }
+
+        ImageData<BufferedImage> imageDataBase = quPath.getViewer().getImageData();
+        ImageData<BufferedImage> imageDataSelected = selectedImageData.get();
+        if (imageDataBase == null) {
+            Dialogs.showErrorMessage(
+                    resources.getString("ImageOverlayAlignmentWindow.alignmentError"),
+                    resources.getString("ImageOverlayAlignmentWindow.noImageAvailable")
+            );
+            return;
+        }
+        if (imageDataSelected == null) {
+            Dialogs.showErrorMessage(
+                    resources.getString("ImageOverlayAlignmentWindow.alignmentError"),
+                    resources.getString("ImageOverlayAlignmentWindow.ensureImageOverlaySelected")
+            );
+            return;
+        }
+        if (imageDataBase == imageDataSelected) {
+            Dialogs.showErrorMessage(
+                    resources.getString("ImageOverlayAlignmentWindow.alignmentError"),
+                    resources.getString("ImageOverlayAlignmentWindow.selectImageOverlay")
+            );
+            return;
+        }
+
+        try {
+            AutoAligner.align(
+                    imageDataBase,
+                    imageDataSelected,
+                    mapOverlays.get(imageDataSelected),
+                    alignmentType.getValue(),
+                    registrationType.getValue(),
+                    pixelSizeMicrons
+            );
+        } catch (Exception e) {
+            Dialogs.showErrorMessage(
+                    resources.getString("ImageOverlayAlignmentWindow.alignmentError"),
+                    MessageFormat.format(
+                            resources.getString("ImageOverlayAlignmentWindow.errorRequestingImageRegion"), //TODO: change message
+                            e.getLocalizedMessage()
+                    )
+            );
+            logger.error("Error in auto alignment", e);
+        }
     }
 
     @FXML
@@ -291,5 +335,59 @@ class ImageOverlayAlignmentWindow extends Stage {
     @FXML
     private void onPropagateClicked(ActionEvent ignored) {
         //TODO
+    }
+
+    private void affineTransformUpdated() {
+        ImageServerOverlay overlay = mapOverlays.get(selectedImageData.get());
+        if (overlay == null) {
+            affineTransformation.setText("No overlay selected");
+            return;
+        }
+
+        Affine affine = overlay.getAffine();
+        affineTransformation.setText(
+                String.format(
+                        "%.4f, \t %.4f,\t %.4f,\n" +
+                        "%.4f,\t %.4f,\t %.4f",
+                        affine.getMxx(), affine.getMxy(), affine.getTx(),
+                        affine.getMyx(), affine.getMyy(), affine.getTy()
+                )
+        );
+    }
+
+    private void rotate(int sign) {
+        double theta;
+        try {
+            theta = sign * Double.parseDouble(rotationIncrement.getText());
+        } catch (NumberFormatException e) {
+            Dialogs.showErrorMessage(
+                    resources.getString("ImageOverlayAlignmentWindow.rotateOverlay"),
+                    MessageFormat.format(
+                            resources.getString("ImageOverlayAlignmentWindow.rotationCannotBeConvertedToNumber"),
+                            rotationIncrement.getText()
+                    )
+            );
+            return;
+        }
+
+        ImageServerOverlay overlay = mapOverlays.get(selectedImageData.get());
+        if (overlay == null) {
+            Dialogs.showErrorMessage(
+                    resources.getString("ImageOverlayAlignmentWindow.rotateOverlay"),
+                    resources.getString("ImageOverlayAlignmentWindow.noOverlaySelected")
+            );
+            return;
+        }
+
+        QuPathViewer viewer = quPath.getViewer();
+        if (viewer == null) {
+            Dialogs.showErrorMessage(
+                    resources.getString("ImageOverlayAlignmentWindow.rotateOverlay"),
+                    resources.getString("ImageOverlayAlignmentWindow.noActiveViewer")
+            );
+            return;
+        }
+
+        overlay.getAffine().appendRotation(theta, viewer.getCenterPixelX(), viewer.getCenterPixelY());
     }
 }
