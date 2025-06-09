@@ -36,7 +36,7 @@ class InteractiveImageAlignmentCommand implements Runnable {
 
 	private static final Logger logger = LoggerFactory.getLogger(InteractiveImageAlignmentCommand.class);
 	private final QuPathGUI qupath;
-	private ImageOverlayAlignmentWindow imageOverlayAlignmentWindow;
+	private ImageAlignmentWindow imageAlignmentWindow;
 	
 	/**
 	 * Constructor.
@@ -49,16 +49,16 @@ class InteractiveImageAlignmentCommand implements Runnable {
 
 	@Override
 	public void run() {
-		if (imageOverlayAlignmentWindow == null) {
+		if (imageAlignmentWindow == null) {
             try {
-                imageOverlayAlignmentWindow = new ImageOverlayAlignmentWindow(qupath);
+                imageAlignmentWindow = new ImageAlignmentWindow(qupath);
             } catch (IOException e) {
 				logger.error("Error while creating image overlay alignment window", e);
 				return;
             }
         }
-		imageOverlayAlignmentWindow.show();
-		imageOverlayAlignmentWindow.requestFocus();
+		imageAlignmentWindow.show();
+		imageAlignmentWindow.requestFocus();
 
 		new ImageAlignmentPane(qupath);
 	}

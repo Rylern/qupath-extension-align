@@ -77,7 +77,7 @@
                             <ComboBox fx:id="alignmentType" maxWidth="1.7976931348623157E308" GridPane.columnIndex="1" GridPane.hgrow="ALWAYS" GridPane.rowIndex="2" />
                             <Label text="%ImageOverlayAlignmentWindow.pixelSize" GridPane.rowIndex="3" />
                             <TextField fx:id="pixelSize" prefColumnCount="6" GridPane.columnIndex="1" GridPane.rowIndex="3" />
-                            <Button maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#onEstimateTransformClicked" text="%ImageOverlayAlignmentWindow.estimateTransform" GridPane.columnSpan="2147483647" GridPane.rowIndex="4" />
+                            <Button fx:id="estimateTransform" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#onEstimateTransformClicked" text="%ImageOverlayAlignmentWindow.estimateTransform" GridPane.columnSpan="2147483647" GridPane.rowIndex="4" />
                         </GridPane>
                     </TitledPane>
                     <TitledPane collapsible="false" text="%ImageOverlayAlignmentWindow.affineTransform">

@@ -79,7 +79,7 @@ public class AlignExtension implements QuPathExtension {
 		private ExperimentalCommands(QuPathGUI qupath) {
 			var interactiveAlignment = new InteractiveImageAlignmentCommand(qupath);
 
-			//TODO: project really needed?
+			//TODO: project really needed? No
 			actionInteractiveAlignment = qupath.createProjectAction(project -> interactiveAlignment.run());
 			actionInteractiveAlignment.setText(resources.getString("Extension.interactiveImageAlignment"));
 			actionInteractiveAlignment.setLongText(resources.getString("Extension.interactiveImageAlignmentDescription"));
