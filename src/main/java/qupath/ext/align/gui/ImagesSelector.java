@@ -10,12 +10,16 @@ import javafx.scene.layout.VBox;
 import org.controlsfx.control.ListSelectionView;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import qupath.ext.align.Utils;
 import qupath.lib.projects.ProjectImageEntry;
 
 import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.util.List;
 
+/**
+ * A pane that asks the user to select project entries.
+ */
 class ImagesSelector extends VBox {
 
     private static final Logger logger = LoggerFactory.getLogger(ImagesSelector.class);
@@ -23,6 +27,14 @@ class ImagesSelector extends VBox {
     @FXML
     private ListSelectionView<ProjectImageEntry<BufferedImage>> images;
 
+    /**
+     * Create the pane.
+     *
+     * @param allEntries all project entries that can be selected or unselected
+     * @param alreadySelectedEntries some project entries to show as already selected
+     * @throws IOException if an error occurs while loading the FXML file containing this pane
+     * @throws NullPointerException if one of the provided list is null or if they contain a null element
+     */
     public ImagesSelector(List<ProjectImageEntry<BufferedImage>> allEntries, List<ProjectImageEntry<BufferedImage>> alreadySelectedEntries) throws IOException {
         this.allEntries = allEntries;
 
@@ -41,21 +53,26 @@ class ImagesSelector extends VBox {
 
             images.getSourceItems().setAll(allEntries.stream()
                     .filter(entry ->
-                            !images.getTargetItems().contains(entry) && (text.isEmpty() || entry.getImageName().toLowerCase().contains(text))
+                            !images.getTargetItems().contains(entry) && entry.getImageName().toLowerCase().contains(text)
                     )
                     .toList()
             );
         });
-        filter.setMaxWidth(Double.MAX_VALUE);   //TODO: check if necessary
         images.setSourceFooter(filter);
     }
 
+    /**
+     * @return all entries that were not selected by the user
+     */
     public List<ProjectImageEntry<BufferedImage>> getUnselectedImages() {
         return allEntries.stream()
                 .filter(entry -> !images.getTargetItems().contains(entry))
                 .toList();
     }
 
+    /**
+     * @return all entries that were selected by the user
+     */
     public List<ProjectImageEntry<BufferedImage>> getSelectedImages() {
         return images.getTargetItems();
     }

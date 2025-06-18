@@ -26,40 +26,41 @@ import org.slf4j.LoggerFactory;
 import qupath.lib.gui.QuPathGUI;
 
 import java.io.IOException;
+import java.util.Objects;
 
 /**
- * Command to interactively adjust apply an affine transform to an image overlay.
+ * A command to start an {@link AlignWindow}.
  * 
  * @author Pete Bankhead
  */
-class InteractiveImageAlignmentCommand implements Runnable {
+class AlignCommand implements Runnable {
 
-	private static final Logger logger = LoggerFactory.getLogger(InteractiveImageAlignmentCommand.class);
+	private static final Logger logger = LoggerFactory.getLogger(AlignCommand.class);
 	private final QuPathGUI qupath;
-	private ImageAlignmentWindow imageAlignmentWindow;
+	private AlignWindow alignWindow;
 	
 	/**
-	 * Constructor.
+	 * Create the command.
 	 *
 	 * @param qupath the QuPath GUI that should own this command
+	 * @throws NullPointerException if the provided parameter is null
 	 */
-	public InteractiveImageAlignmentCommand(QuPathGUI qupath) {
-		this.qupath = qupath;
+	public AlignCommand(QuPathGUI qupath) {
+		this.qupath = Objects.requireNonNull(qupath);
 	}
 
 	@Override
 	public void run() {
-		if (imageAlignmentWindow == null) {
+		if (alignWindow == null) {
             try {
-                imageAlignmentWindow = new ImageAlignmentWindow(qupath);
+				logger.debug("Image alignment window of {} does not exit. Creating it", qupath);
+                alignWindow = new AlignWindow(qupath);
             } catch (IOException e) {
 				logger.error("Error while creating image overlay alignment window", e);
 				return;
             }
         }
-		imageAlignmentWindow.show();
-		imageAlignmentWindow.requestFocus();
-
-		new ImageAlignmentPane(qupath);
+		alignWindow.show();
+		alignWindow.requestFocus();
 	}
 }
