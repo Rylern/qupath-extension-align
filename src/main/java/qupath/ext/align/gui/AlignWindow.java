@@ -119,11 +119,11 @@ class AlignWindow extends Stage {
 
         Utils.loadFXML(this, AlignWindow.class.getResource("image_alignment_window.fxml"));
 
-        imageDataAndViewerToTransform = Utils.createMappedObservableMap(
+        imageDataAndViewerToTransform = Utils.createKeyMappedObservableMap(
                 createImageDataViewerList(),
                 imageDataViewer -> {
                     try {
-                        return new ImageTransform(imageDataViewer.imageData().getServer(), imageDataViewer.viewer());
+                        return new ImageTransform(imageDataViewer.imageData(), imageDataViewer.viewer());
                     } catch (Exception e) {
                         logger.error("Error while getting image server of {}. Cannot create image transform", imageDataViewer.imageData(), e);
                         return null;
@@ -628,11 +628,11 @@ class AlignWindow extends Stage {
     }
 
     private ObservableList<ImageDataViewer> createImageDataViewerList() {
-        ObservableList<ImageDataViewer> list = FXCollections.observableArrayList();
+        ObservableList<ImageDataViewer> imageDataViewers = FXCollections.observableArrayList();
 
         for (ImageData<BufferedImage> imageData: images.getItems()) {
             for (QuPathViewer viewer: quPath.getAllViewers()) {
-                list.add(new ImageDataViewer(imageData, viewer));
+                imageDataViewers.add(new ImageDataViewer(imageData, viewer));
             }
         }
 
@@ -641,13 +641,13 @@ class AlignWindow extends Stage {
                 if (change.wasAdded()) {
                     for (ImageData<BufferedImage> imageData: change.getAddedSubList()) {
                         for (QuPathViewer viewer: quPath.getAllViewers()) {
-                            list.add(new ImageDataViewer(imageData, viewer));
+                            imageDataViewers.add(new ImageDataViewer(imageData, viewer));
                         }
                     }
                 }
                 if (change.wasRemoved()) {
                     for (ImageData<BufferedImage> imageData: change.getRemoved()) {
-                        list.removeIf(imageDataViewer -> imageDataViewer.imageData().equals(imageData));
+                        imageDataViewers.removeIf(imageDataViewer -> imageData.equals(imageDataViewer.imageData()));
                     }
                 }
             }
@@ -658,20 +658,20 @@ class AlignWindow extends Stage {
                 if (change.wasAdded()) {
                     for (QuPathViewer viewer: change.getAddedSubList()) {
                         for (ImageData<BufferedImage> imageData: images.getItems()) {
-                            list.add(new ImageDataViewer(imageData, viewer));
+                            imageDataViewers.add(new ImageDataViewer(imageData, viewer));
                         }
                     }
                 }
                 if (change.wasRemoved()) {
                     for (QuPathViewer viewer: change.getRemoved()) {
-                        list.removeIf(imageDataViewer -> imageDataViewer.viewer().equals(viewer));
+                        imageDataViewers.removeIf(imageDataViewer -> imageDataViewer.viewer().equals(viewer));
                     }
                 }
             }
             change.reset();
         });
 
-        return list;
+        return imageDataViewers;
     }
 
     private void rotate(int sign) {

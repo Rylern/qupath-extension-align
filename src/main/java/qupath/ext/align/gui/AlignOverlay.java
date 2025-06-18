@@ -16,6 +16,7 @@ import qupath.lib.regions.ImageRegion;
 import java.awt.*;
 import java.awt.geom.AffineTransform;
 import java.awt.image.BufferedImage;
+import java.io.IOException;
 import java.util.Objects;
 
 /**
@@ -75,7 +76,15 @@ class AlignOverlay extends AbstractOverlay implements AutoCloseable {
     public void paintOverlay(Graphics2D g2d, ImageRegion imageRegion, double downsampleFactor, ImageData<BufferedImage> imageData, boolean paintCompletely) {
         ImageTransform imageTransform = observableImageTransform.getValue();
         if (imageTransform == null) {
-            logger.trace("No current image transform. ");
+            logger.trace("No current image transform. Cannot paint align overlay on {}", viewer);
+            return;
+        }
+
+        ImageDisplay imageDisplay;
+        try {
+            imageDisplay = imageTransform.getImageDisplay();
+        } catch (IOException e) {
+            logger.error("Cannot get image display of {}. Cannot paint align overlay on {}", imageTransform, viewer, e);
             return;
         }
 
@@ -100,7 +109,7 @@ class AlignOverlay extends AbstractOverlay implements AutoCloseable {
         );
 
         viewer.getImageRegionStore().paintRegion(
-                imageTransform.getImageServer(),
+                imageTransform.getImageData().getServer(),
                 graphics,
                 graphics.getClip(),
                 imageRegion.getZ(),
@@ -108,7 +117,7 @@ class AlignOverlay extends AbstractOverlay implements AutoCloseable {
                 downsampleFactor,
                 null,
                 null,
-                viewer.getImageDisplay()
+                imageDisplay
         );
 
         graphics.dispose();

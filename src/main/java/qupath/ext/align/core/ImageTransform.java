@@ -5,10 +5,10 @@ import javafx.beans.property.SimpleObjectProperty;
 import javafx.beans.value.ObservableValue;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import qupath.lib.display.ImageDisplay;
 import qupath.lib.geom.Point2;
 import qupath.lib.gui.viewer.QuPathViewer;
 import qupath.lib.images.ImageData;
-import qupath.lib.images.servers.ImageServer;
 import qupath.lib.images.servers.PixelCalibration;
 import qupath.lib.roi.ROIs;
 import qupath.lib.roi.RoiTools;
@@ -19,6 +19,7 @@ import java.awt.geom.AffineTransform;
 import java.awt.geom.NoninvertibleTransformException;
 import java.awt.geom.Point2D;
 import java.awt.image.BufferedImage;
+import java.io.IOException;
 import java.util.Arrays;
 import java.util.Objects;
 
@@ -31,23 +32,27 @@ public class ImageTransform {
 
     private static final Logger logger = LoggerFactory.getLogger(ImageTransform.class);
     private final ObjectProperty<AffineTransform> transform = new SimpleObjectProperty<>(new AffineTransform());
-    private final ImageServer<BufferedImage> imageServer;
+    private final ImageData<BufferedImage> imageData;
     private final QuPathViewer viewer;
     private AffineTransform inverseTransform = new AffineTransform();
+    private ImageDisplay imageDisplay;
 
     /**
      * Create the image transform.
      * <p>
-     * The transform will be initialized as the identity matrix. If the provided image server
+     * The transform will be initialized as the identity matrix. If the provided image data
      * and the provided viewer have a defined pixel size in microns, the transform will be scaled to
      * the pixel size of the provided viewer divided by the pixel size of the provided image.
+     * <p>
+     * It is expected that the image server associated with the provided image data (see {@link ImageData#getServer()}
+     * is already created.
      *
-     * @param imageServer the image the transform should be applied to
+     * @param imageData the image data the transform should be applied to
      * @param viewer the viewer the image should be transformed to
      * @throws NullPointerException if one of the provided parameters is null
      */
-    public ImageTransform(ImageServer<BufferedImage> imageServer, QuPathViewer viewer) {
-        this.imageServer = Objects.requireNonNull(imageServer);
+    public ImageTransform(ImageData<BufferedImage> imageData, QuPathViewer viewer) {
+        this.imageData = Objects.requireNonNull(imageData);
         this.viewer = Objects.requireNonNull(viewer);
 
         resetTransform();
@@ -57,7 +62,7 @@ public class ImageTransform {
     public String toString() {
         return String.format(
                 "Image transform of %s and %s with transform %s and inverse transform %s",
-                imageServer,
+                imageData,
                 viewer,
                 transform.get(),
                 inverseTransform
@@ -149,14 +154,14 @@ public class ImageTransform {
     }
 
     /**
-     * Reset the transform with the value described in {@link #ImageTransform(ImageServer, QuPathViewer)}.
+     * Reset the transform with the value described in {@link #ImageTransform(ImageData, QuPathViewer)}.
      */
     public void resetTransform() {
         AffineTransform transform = new AffineTransform();
 
         if (viewer.getImageData() != null) {
             PixelCalibration viewerImageCalibration = viewer.getImageData().getServer().getPixelCalibration();
-            PixelCalibration overlayImageCalibration = imageServer.getPixelCalibration();
+            PixelCalibration overlayImageCalibration = imageData.getServer().getPixelCalibration();
 
             if (viewerImageCalibration.hasPixelSizeMicrons() && overlayImageCalibration.hasPixelSizeMicrons()) {
                 transform.scale(
@@ -220,10 +225,25 @@ public class ImageTransform {
     }
 
     /**
-     * @return the image to which the transform should be applied
+     * @return the image data to which the transform should be applied
      */
-    public ImageServer<BufferedImage> getImageServer() {
-        return imageServer;
+    public ImageData<BufferedImage> getImageData() {
+        return imageData;
+    }
+
+    /**
+     * Get an image display that can be used when painting the image returned by {@link #getImageData()}.
+     * The first call to this function may take some time as it will generate the image display. Further calls
+     * will use the previously generated image display so will be faster.
+     *
+     * @return an image display that can be used when painting the image
+     * @throws IOException if an error occurs while creating the image display
+     */
+    public ImageDisplay getImageDisplay() throws IOException {
+        if (imageDisplay == null) {
+            imageDisplay = ImageDisplay.create(imageData);
+        }
+        return imageDisplay;
     }
 
     private void updateTransform(AffineTransform transform) {

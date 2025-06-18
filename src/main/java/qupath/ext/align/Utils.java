@@ -69,7 +69,7 @@ public class Utils {
      * @param <V> the type of the values of the returned map
      * @throws NullPointerException if one of the provided parameter is null
      */
-    public static <T, V> ObservableMap<T, V> createMappedObservableMap(ObservableList<T> list, Function<T, V> keyToValue) {
+    public static <T, V> ObservableMap<T, V> createKeyMappedObservableMap(ObservableList<T> list, Function<T, V> keyToValue) {
         ObservableMap<T, V> map = FXCollections.observableHashMap();
 
         for (T item : list) {
