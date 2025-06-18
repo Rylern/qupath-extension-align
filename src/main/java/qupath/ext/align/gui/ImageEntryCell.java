@@ -124,8 +124,8 @@ class ImageEntryCell extends ListCell<ImageData<BufferedImage>> {
                 if (!getStyleClass().contains("current-viewer-cell")) {
                     getStyleClass().add("current-viewer-cell");
                 }
+                return;
             }
-            return;
         } catch (Exception e) {
             logger.debug("Cannot get server of {}. Considering it is not in the current viewer", item, e);
         }
