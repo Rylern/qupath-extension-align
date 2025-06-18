@@ -6,6 +6,7 @@ import javafx.beans.value.ObservableValue;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import qupath.ext.align.core.ImageTransform;
+import qupath.lib.display.ImageDisplay;
 import qupath.lib.gui.prefs.PathPrefs;
 import qupath.lib.gui.viewer.QuPathViewer;
 import qupath.lib.gui.viewer.overlays.AbstractOverlay;
@@ -29,9 +30,11 @@ class AlignOverlay extends AbstractOverlay implements AutoCloseable {
     private final ObservableValue<ImageTransform> observableImageTransform;
     private final ObservableDoubleValue opacity;
     private final ChangeListener<? super Number> opacityListener;
+    private final ChangeListener<? super ImageTransform> transformListener;
 
     /**
      * Create the overlay and add it to the provided viewer's {@link QuPathViewer#getCustomOverlayLayers() list of custom overlay layers}.
+     * The provided viewer will be asked to be repainted when the value of provided image transform changes.
      *
      * @param viewer the viewer on which the overlay will be placed
      * @param observableImageTransform an observable value that contains the image (and the transform to apply to it) to display
@@ -51,6 +54,11 @@ class AlignOverlay extends AbstractOverlay implements AutoCloseable {
         this.opacity = opacity;
         this.opacityListener = (p, o, n) -> {
             setOpacity(n.doubleValue());
+            logger.trace("Opacity updated to {}. Asking to repaint {}", n, viewer);
+            viewer.repaint();
+        };
+        this.transformListener = (p, o, n) -> {
+            logger.trace("Image transform updated to {}. Asking to repaint {}", n, viewer);
             viewer.repaint();
         };
 
@@ -58,6 +66,9 @@ class AlignOverlay extends AbstractOverlay implements AutoCloseable {
 
         opacity.addListener(opacityListener);
         opacityListener.changed(opacity, null, opacity.getValue());
+
+        observableImageTransform.addListener(transformListener);
+        transformListener.changed(observableImageTransform, null, observableImageTransform.getValue());
     }
 
     @Override
@@ -121,6 +132,7 @@ class AlignOverlay extends AbstractOverlay implements AutoCloseable {
         viewer.getCustomOverlayLayers().remove(this);
 
         opacity.removeListener(opacityListener);
+        observableImageTransform.removeListener(transformListener);
 
         logger.debug("Overlay for {} closed", viewer);
     }

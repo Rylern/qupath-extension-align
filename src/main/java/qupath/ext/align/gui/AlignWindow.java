@@ -140,15 +140,6 @@ class AlignWindow extends Stage {
                 images.getSelectionModel().selectedItemProperty(),
                 quPath.viewerProperty()
         ));
-        selectedImageTransform.addListener((p, o, n) -> {
-            if (quPath.viewerProperty().get() != null) {
-                logger.trace("Selected image transform updated to {}. Repainting {}", n, quPath.viewerProperty().get());
-                quPath.viewerProperty().get().repaint();
-
-            } else {
-                logger.trace("Selected image transform updated to {} but no current viewer exists, not repainting anything", n);
-            }
-        });
 
         BooleanProperty inactiveOverlayImageOrViewerImage = new SimpleBooleanProperty(true);
         selectedImageTransform.addListener((p, o, n) ->
